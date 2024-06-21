@@ -63,7 +63,7 @@ public class GoogleFitManager implements ActivityEventListener {
     private SleepHistory sleepHistory;
 
     private static final String TAG = "RNGoogleFit";
-//    reserve to replace deprecated Api in the future
+
     private GoogleSignInClient mSignInClient;
 
     public GoogleFitManager(ReactContext reactContext, Activity activity) {
@@ -134,19 +134,16 @@ public class GoogleFitManager implements ActivityEventListener {
     public void authorize(ArrayList<String> userScopes) {
         final ReactContext mReactContext = this.mReactContext;
 
-//    reserve to replace deprecated Api in the future
-//        GoogleSignInOptions.Builder optionsBuilder =
-//                new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-//                        .requestEmail()
-//                        .requestProfile();
-//
-//        for (String scopeName : userScopes) {
-//            optionsBuilder.requestScopes(new Scope(scopeName));
-//        }
-//
-//        mSignInClient = GoogleSignIn.getClient(this.mActivity, optionsBuilder.build());
-//        Intent intent = mSignInClient.getSignInIntent();
-//        this.mActivity.startActivityForResult(intent, REQUEST_OAUTH);
+        GoogleSignInOptions.Builder optionsBuilder =
+            new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN);
+
+       for (String scopeName : userScopes) {
+           optionsBuilder.requestScopes(new Scope(scopeName));
+       }
+
+       mSignInClient = GoogleSignIn.getClient(this.mActivity, optionsBuilder.build());
+       Intent intent = mSignInClient.getSignInIntent();
+       this.mActivity.startActivityForResult(intent, REQUEST_OAUTH);
 
         GoogleApiClient.Builder apiClientBuilder = new GoogleApiClient.Builder(mReactContext.getApplicationContext())
                 .addApi(Fitness.SENSORS_API)
@@ -154,9 +151,17 @@ public class GoogleFitManager implements ActivityEventListener {
                 .addApi(Fitness.RECORDING_API)
                 .addApi(Fitness.SESSIONS_API);
 
+        // Getting the scopes above via GooogleSignInOptions.Builder.requestScopes() seems to get around the 
+        // OAuth 2.0 granular permissions issue of requesting a combination of signin scopes (e.g. email 
+        // address) and non-signin scopes (e.g. weight / steps / sleep)
+        // (hacky but seems to work fine for syncing all the scopes we need - i.e. weight / steps / sleep, 
+        // but the only side effect is that the Google Fit permission dialog pops up twice in a row instead 
+        // of once when the user first signs in)
+        /*
         for (String scopeName : userScopes) {
             apiClientBuilder.addScope(new Scope(scopeName));
         }
+        */
 
         mApiClient = apiClientBuilder
                 .addConnectionCallbacks(
@@ -252,32 +257,32 @@ public class GoogleFitManager implements ActivityEventListener {
                 .emit(eventName, params);
     }
 
-//    reserve to replace deprecated Api in the future
-//    @Override
-//    public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
-//        // Result returned from launching the Intent from GoogleSignInClient.getSignInIntent(...);
-//        if (requestCode == REQUEST_OAUTH) {
-//            // The Task returned from this call is always completed, no need to attach
-//            // a listener.
-//            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-//            handleSignInResult(task);
-//        }
-//    }
-//
-//    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
-//        try {
-//            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
-//            if (!mApiClient.isConnecting() && !mApiClient.isConnected()) {
-//                mApiClient.connect();
-//            }
-//        } catch (ApiException e) {
-//            Log.e(TAG, "Authorization - Cancel");
-//            WritableMap map = Arguments.createMap();
-//            map.putString("message", "" + "Authorization cancelled");
-//            sendEvent(mReactContext, "GoogleFitAuthorizeFailure", map);
-//        }
-//    }
+   @Override
+   public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+       // Result returned from launching the Intent from GoogleSignInClient.getSignInIntent(...);
+       if (requestCode == REQUEST_OAUTH) {
+           // The Task returned from this call is always completed, no need to attach
+           // a listener.
+           Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+           handleSignInResult(task);
+       }
+   }
 
+   private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
+       try {
+           GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+           if (!mApiClient.isConnecting() && !mApiClient.isConnected()) {
+               mApiClient.connect();
+           }
+       } catch (ApiException e) {
+           Log.e(TAG, "Authorization - Cancel");
+           WritableMap map = Arguments.createMap();
+           map.putString("message", "" + "Authorization cancelled");
+           sendEvent(mReactContext, "GoogleFitAuthorizeFailure", map);
+       }
+   }
+
+    /* old code
     @Override
     public void onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_OAUTH) {
@@ -294,7 +299,7 @@ public class GoogleFitManager implements ActivityEventListener {
                 sendEvent(mReactContext, "GoogleFitAuthorizeFailure", map);
             }
         }
-    }
+    } */
 
     @Override
     public void onNewIntent(Intent intent) {
